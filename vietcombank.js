@@ -2,27 +2,33 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-async function fetchExchangeRate() {
+async function fetchExchangeRates() {
   try {
     const url = 'https://www.vietcombank.com.vn/exchangerates/';
     const res = await axios.get(url);
     const html = res.data;
 
-    // Tìm tỷ giá USD bằng regex (có thể thay bằng cheerio nếu muốn)
-    const usdRegex = /<td>USD<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>/i;
-    const match = html.match(usdRegex);
-
-    if (!match) throw new Error('Không tìm thấy tỷ giá USD');
-
-    const buyRate = match[1].trim();
-    const sellRate = match[2].trim();
-
+    const currencies = ['USD', 'EUR'];
     const data = {
       date: new Date().toISOString(),
-      currency: 'USD',
-      buy: buyRate,
-      sell: sellRate,
+      rates: {}
     };
+
+    for (const currency of currencies) {
+      const regex = new RegExp(
+        `<td>${currency}<\\/td>\\s*<td[^>]*>(.*?)<\\/td>\\s*<td[^>]*>(.*?)<\\/td>`,
+        'i'
+      );
+      const match = html.match(regex);
+
+      if (match) {
+        const buy = match[1].trim();
+        const sell = match[2].trim();
+        data.rates[currency] = { buy, sell };
+      } else {
+        console.warn(`⚠️ Không tìm thấy tỷ giá cho ${currency}`);
+      }
+    }
 
     // Tạo thư mục nếu chưa có
     const dirPath = path.join(__dirname, 'data');
@@ -30,16 +36,16 @@ async function fetchExchangeRate() {
       fs.mkdirSync(dirPath);
     }
 
-    // Ghi file theo ngày
+    // Ghi file JSON theo ngày
     const dateStr = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
     const filepath = path.join(dirPath, `tygia-${dateStr}.json`);
     fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
 
-    console.log(`✔️ Đã lưu tỷ giá USD ngày ${dateStr}`);
+    console.log(`✔️ Đã lưu tỷ giá USD và EUR ngày ${dateStr}`);
     return data;
   } catch (err) {
     console.error('❌ Lỗi khi lấy tỷ giá:', err.message);
   }
 }
 
-module.exports = fetchExchangeRate;
+module.exports = fetchExchangeRates;
