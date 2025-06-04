@@ -4,31 +4,21 @@ const path = require('path');
 
 async function fetchExchangeRates() {
   try {
-    const url = 'https://www.vietcombank.com.vn/exchangerates/';
+    const url = 'https://api.tygia.com/vcb?currency=usd,eur&format=json';
     const res = await axios.get(url);
-    const html = res.data;
 
-    const currencies = ['USD', 'EUR'];
     const data = {
       date: new Date().toISOString(),
       rates: {}
     };
 
-    for (const currency of currencies) {
-      const regex = new RegExp(
-        `<td>${currency}<\\/td>\\s*<td[^>]*>(.*?)<\\/td>\\s*<td[^>]*>(.*?)<\\/td>`,
-        'i'
-      );
-      const match = html.match(regex);
-
-      if (match) {
-        const buy = match[1].trim();
-        const sell = match[2].trim();
-        data.rates[currency] = { buy, sell };
-      } else {
-        console.warn(`⚠️ Không tìm thấy tỷ giá cho ${currency}`);
-      }
-    }
+    res.data.forEach((entry) => {
+      const code = entry.currency.toUpperCase();
+      data.rates[code] = {
+        buy: entry.buy,
+        sell: entry.transfer // hoặc entry.sell tuỳ nhu cầu
+      };
+    });
 
     // Tạo thư mục nếu chưa có
     const dirPath = path.join(__dirname, 'data');
@@ -36,15 +26,15 @@ async function fetchExchangeRates() {
       fs.mkdirSync(dirPath);
     }
 
-    // Ghi file JSON theo ngày
-    const dateStr = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
-    const filepath = path.join(dirPath, `tygia-${dateStr}.json`);
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+    // Lưu file theo ngày
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filePath = path.join(dirPath, `tygia-${dateStr}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 
-    console.log(`✔️ Đã lưu tỷ giá USD và EUR ngày ${dateStr}`);
+    console.log(`✔️ Đã lưu tỷ giá USD & EUR từ API (tygia.com)`);
     return data;
   } catch (err) {
-    console.error('❌ Lỗi khi lấy tỷ giá:', err.message);
+    console.error('❌ Lỗi khi lấy dữ liệu từ API:', err.message);
   }
 }
 
